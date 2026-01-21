@@ -3,102 +3,154 @@ import Combine
 
 @MainActor
 final class ContentViewModel: ObservableObject {
-    @Published var isStarted: Bool = false
     @Published var minutesIndex: Int = 0
+    
     @Published private(set) var totalSeconds: Int = 5 * 60
+    
     @Published private(set) var remainingSeconds: Int = 5 * 60
     
-    private var cancellable: AnyCancellable?
+    @Published private(set) var isStarted: Bool = false
     
-    private var selectedMinutes: Int { (minutesIndex + 1) * 5 }
+    @Published private(set) var startButtonTitle: String = "Start"
+
+    private var timerCancellable: AnyCancellable?
     
-    private func applySelectedMinutes() {
-        totalSeconds = selectedMinutes * 60
-        remainingSeconds = totalSeconds
-    }
+    private var isPaused: Bool = false
+    
+    private var didRecordThisRun: Bool = false
+    
+    // var onRecord: ((RecordReason, Int, Int) -> Void)?
+    var onRecord: ((Int, Int) -> Void)?
 
-    private func startTickerIfNeeded() {
-        guard cancellable == nil else { return }
-
-        cancellable = Timer
-            .publish(every: 1, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] _ in
-                guard let self else { return }
-                guard self.isStarted else { return }
-
-                if self.remainingSeconds > 0 {
-                    self.remainingSeconds -= 1
-                } else {
-                    self.isStarted = false
-                    self.stopTicker()
-                }
-            }
-    }
-
-    private func stopTicker() {
-        cancellable?.cancel()
-        cancellable = nil
-    }
-   
     var progress: Double {
-        guard totalSeconds > 0 else { return 0 }
-        return 1.0 - (Double(remainingSeconds) / Double(totalSeconds))
+        guard totalSeconds > 0 else { return 0.0 }
+        return Double(totalSeconds - remainingSeconds) / Double(totalSeconds)
     }
-    
+
     var timeText: String {
         let m = remainingSeconds / 60
         let s = remainingSeconds % 60
         return String(format: "%02d:%02d", m, s)
     }
 
-    var startButtonTitle: String {
-        if isStarted { return "Start" }
-        return (remainingSeconds < totalSeconds) ? "Resume" : "Start"
-    }
     
-    
-    init() {
-        applySelectedMinutes()
-    }
-
-    deinit {
-        cancellable?.cancel()
-    }
-
     func onAppear() {
-        applySelectedMinutes()
-    }
-    
-    func minutesIndexChanged() {
-        guard !isStarted else { return }
-        applySelectedMinutes()
+        applyMinutesIndexToSeconds()
+        updateStartButtonTitle()
     }
 
     func startOrResume() {
         guard !isStarted else { return }
-        totalSeconds = selectedMinutes * 60
-        if remainingSeconds <= 0 || remainingSeconds > totalSeconds {
-            remainingSeconds = totalSeconds
+
+        if remainingSeconds <= 0 {
+            applyMinutesIndexToSeconds()
+            isPaused = false
         }
 
         isStarted = true
-        startTickerIfNeeded()
+        if !isPaused {
+            didRecordThisRun = false
+        }
+        updateStartButtonTitle()
+        startTimer()
     }
+    
+    func minutesIndexChanged() {
+        guard !isStarted else { return }
 
-    func pause() {
-        isStarted = false
-        stopTicker()
-    }
-
-    func reset() {
-        isStarted = false
-        stopTicker()
-        applySelectedMinutes()
+        isPaused = false
+        applyMinutesIndexToSeconds()
+        updateStartButtonTitle()
     }
 
     func stop() {
-        reset()
+        stopTimer()
+
+         let elapsed = max(0, totalSeconds - remainingSeconds)
+         if elapsed > 0 && !didRecordThisRun {
+             didRecordThisRun = true
+             onRecord?(elapsed, totalSeconds)
+         }
+
+         isStarted = false
+         isPaused = false
+         remainingSeconds = totalSeconds
+         didRecordThisRun = false
+         updateStartButtonTitle()
     }
 
+    func pause() {
+        guard isStarted else { return }
+        stopTimer()
+        isStarted = false
+        isPaused = true
+        updateStartButtonTitle()
+    }
+
+    func reset() {
+        stopTimer()
+        isStarted = false
+        isPaused = false
+        didRecordThisRun = false
+        remainingSeconds = totalSeconds
+        updateStartButtonTitle()
+    }
+
+    
+    private func startTimer() {
+        stopTimer()
+
+        timerCancellable = Timer
+            .publish(every: 1.0, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                self?.tick()
+            }
+    }
+
+    private func stopTimer() {
+        timerCancellable?.cancel()
+        timerCancellable = nil
+    }
+
+
+    private func finish() {
+        
+        if !didRecordThisRun {
+            didRecordThisRun = true
+            onRecord?(totalSeconds, totalSeconds)
+        }
+
+        stopTimer()
+        isStarted = false
+        isPaused = false
+        remainingSeconds = 0
+        didRecordThisRun = false
+        updateStartButtonTitle()
+    }
+    
+    private func tick() {
+        guard remainingSeconds > 0 else {
+            finish()
+            return
+        }
+
+        remainingSeconds -= 1
+
+        if remainingSeconds <= 0 {
+            finish()
+        }
+    }
+
+    
+    private func applyMinutesIndexToSeconds() {
+        let minutes = (minutesIndex + 1) * 5
+        totalSeconds = minutes * 60
+        remainingSeconds = totalSeconds
+    }
+
+    private func updateStartButtonTitle() {
+        startButtonTitle = isPaused ? "Resume" : "Start"
+    }
 }
+
