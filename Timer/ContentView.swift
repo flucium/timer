@@ -5,6 +5,10 @@ import SwiftData
 struct ContentView: View {
     
     @State private var selection: Destination? = .timer
+    
+    @StateObject private var timerViewModel = ContentViewModel()
+    @State private var pendingSelection: Destination? = nil
+    @State private var showLeaveTimerAlert = false
 
     var body: some View {
         NavigationSplitView {
@@ -18,11 +22,19 @@ struct ContentView: View {
                 NavigationLink(value: Destination.settings) {
                     Label("Settings", systemImage: "gear")
                 }
+            }.onChange(of: selection) { _, newValue in
+                guard timerViewModel.isStarted || timerViewModel.isPaused else { return }
+                guard newValue != .timer else { return }
+
+                pendingSelection = newValue
+                selection = .timer
+                showLeaveTimerAlert = true
             }
         } detail: {
             switch selection {
             case .timer:
-                TimerView()
+                // TimerView()
+                TimerView(contentViewModel: timerViewModel)
             case .history:
                 HistoryView()
             case .settings:
@@ -30,6 +42,19 @@ struct ContentView: View {
             default:
                 EmptyView()
             }
+        }.alert("Timer is running", isPresented: $showLeaveTimerAlert) {
+            Button("Leave", role: .destructive) {
+
+                timerViewModel.stop()
+
+                selection = pendingSelection
+                pendingSelection = nil
+            }
+            Button("Stay", role: .cancel) {
+                pendingSelection = nil
+            }
+        } message: {
+            Text("Leaving will stop the timer. Do you want to leave the Timer view?")
         }
     }
 
@@ -40,7 +65,8 @@ struct ContentView: View {
 struct TimerView: View{
     @Environment(\.modelContext) private var modelContext
     
-    @StateObject private var contentViewModel = ContentViewModel()
+    // @StateObject private var contentViewModel = ContentViewModel()
+    @ObservedObject var contentViewModel: ContentViewModel
     
     var body: some View {
         VStack {
@@ -104,7 +130,8 @@ struct TimerView: View{
                     contentViewModel.pause()
                 }
                 .buttonStyle(.bordered)
-                .disabled(!contentViewModel.isStarted)
+                // .disabled(!contentViewModel.isStarted)
+                .disabled(!contentViewModel.isStarted || contentViewModel.isPaused)
 
                 Button("Reset") {
                     contentViewModel.reset()
@@ -115,13 +142,15 @@ struct TimerView: View{
                     contentViewModel.stop()
                 }
                 .buttonStyle(.bordered)
-                .disabled(!contentViewModel.isStarted)
+                // .disabled(!contentViewModel.isStarted)
+                .disabled(!contentViewModel.isStarted && !contentViewModel.isPaused)
             }
             .padding()
         }
         .padding()
         .onAppear {
             contentViewModel.onAppear()
+
             contentViewModel.onRecord = { elapsed, set in
                 modelContext.insert(
                     HistoryEntry(
