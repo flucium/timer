@@ -1,10 +1,11 @@
 import Combine
 import SwiftUI
+import SwiftData
 
 struct ContentView: View {
-    @StateObject private var contentViewModel = ContentViewModel()
-    @State private var selection: Destination? = .timer
     
+    @State private var selection: Destination? = .timer
+
     var body: some View {
         NavigationSplitView {
             List(selection: $selection) {
@@ -12,7 +13,7 @@ struct ContentView: View {
                     Label("Timer", systemImage: "timer")
                 }
                 NavigationLink(value: Destination.history) {
-                    Label("History", systemImage: "info")
+                    Label("History", systemImage: "text.justify")
                 }
                 NavigationLink(value: Destination.settings) {
                     Label("Settings", systemImage: "gear")
@@ -21,9 +22,9 @@ struct ContentView: View {
         } detail: {
             switch selection {
             case .timer:
-                timerView
+                TimerView()
             case .history:
-                EmptyView()
+                HistoryView()
             case .settings:
                 EmptyView()
             default:
@@ -32,7 +33,16 @@ struct ContentView: View {
         }
     }
 
-    private var timerView: some View {
+    
+    
+}
+
+struct TimerView: View{
+    @Environment(\.modelContext) private var modelContext
+    
+    @StateObject private var contentViewModel = ContentViewModel()
+    
+    var body: some View {
         VStack {
             ZStack {
                 Circle()
@@ -110,11 +120,86 @@ struct ContentView: View {
             .padding()
         }
         .padding()
-        .onAppear { contentViewModel.onAppear() }
-    }
-        
-}
+        .onAppear {
+            contentViewModel.onAppear()
+            contentViewModel.onRecord = { elapsed, set in
+                modelContext.insert(
+                    HistoryEntry(
+                        elapsedSeconds: elapsed,
+                        setSeconds: set
+                    )
+                )
+            }
+        }
     
+    }
+}
+
+struct HistoryView: View {
+    @Environment(\.modelContext) private var modelContext
+
+    @Query(sort: \HistoryEntry.createdAt, order: .reverse) private var items: [HistoryEntry]
+
+    @State private var selection: Set<HistoryEntry> = []
+
+    var body: some View {
+        List(selection: $selection) {
+            ForEach(items) { item in
+                HStack {
+                    Text(
+                        "CreatedAt: \(time(item.createdAt)), " +
+                        "SetTime: \(formatSeconds(item.setSeconds)), " +
+                        "Total: \(formatSeconds(item.elapsedSeconds))"
+                    )
+                }
+                .tag(item)
+                .contextMenu {
+                    Button("Delete") {
+                        delete(item)
+                    }
+                }
+            }
+            .onDelete(perform: deleteByIndexSet)
+        }
+        .navigationTitle("History")
+        .onReceive(
+            NotificationCenter.default.publisher(for: .deleteHistorySelection)
+        ) { _ in
+            deleteSelection()
+        }
+    }
+    
+    private func delete(_ item: HistoryEntry) {
+        modelContext.delete(item)
+        selection.remove(item)
+
+    }
+
+    private func deleteByIndexSet(_ indexSet: IndexSet) {
+        for i in indexSet {
+            modelContext.delete(items[i])
+        }
+    }
+
+    private func deleteSelection() {
+        for item in selection {
+            modelContext.delete(item)
+        }
+        selection.removeAll()
+    }
+
+    private func time(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.timeStyle = .short
+        f.dateStyle = .none
+        return f.string(from: date)
+    }
+
+    private func formatSeconds(_ s: Int) -> String {
+        String(format: "%02d:%02d", s / 60, s % 60)
+    }
+}
+
 #Preview {
     ContentView()
 }
