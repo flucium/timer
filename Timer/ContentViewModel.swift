@@ -4,21 +4,25 @@ import Combine
 @MainActor
 final class ContentViewModel: ObservableObject {
     @Published var minutesIndex: Int = 0
+
+    @Published private(set) var hasAppeared: Bool = false
     
     @Published private(set) var totalSeconds: Int = 5 * 60
     
     @Published private(set) var remainingSeconds: Int = 5 * 60
     
     @Published private(set) var isStarted: Bool = false
+
+    @Published private(set) var isPaused: Bool = false
+
     
     @Published private(set) var startButtonTitle: String = "Start"
 
     private var timerCancellable: AnyCancellable?
-    
-    private var isPaused: Bool = false
+
     
     private var didRecordThisRun: Bool = false
-    
+
     // var onRecord: ((RecordReason, Int, Int) -> Void)?
     var onRecord: ((Int, Int) -> Void)?
 
@@ -44,20 +48,29 @@ final class ContentViewModel: ObservableObject {
 
         if remainingSeconds <= 0 {
             applyMinutesIndexToSeconds()
-            isPaused = false
         }
-
+        
+        isPaused = false
         isStarted = true
-        if !isPaused {
-            didRecordThisRun = false
-        }
+
+        didRecordThisRun = false
+
         updateStartButtonTitle()
         startTimer()
     }
     
     func minutesIndexChanged() {
         guard !isStarted else { return }
-
+        
+        stopTimer()
+        
+        let elapsed = max(0, totalSeconds - remainingSeconds)
+        if elapsed > 0 && !didRecordThisRun {
+            didRecordThisRun = true
+            onRecord?(elapsed, totalSeconds)
+        }
+        
+        
         isPaused = false
         applyMinutesIndexToSeconds()
         updateStartButtonTitle()
