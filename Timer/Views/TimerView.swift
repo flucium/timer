@@ -5,6 +5,7 @@ struct TimerView: View {
     @Environment(\.modelContext) private var modelContext
 
     @EnvironmentObject private var timerViewModel: TimerViewModel
+    @EnvironmentObject private var notificationViewModel: NotificationViewModel
     
     var body: some View {
         
@@ -17,6 +18,7 @@ struct TimerView: View {
                     .stroke(lineWidth: 6.0)
                     .opacity(0.2)
                     .foregroundStyle(Color.blue)
+                    
                 // -- End Circle (default) --
                 
                 // -- Circle (progress) --
@@ -74,6 +76,7 @@ struct TimerView: View {
                 // -- Button (start or resume) --
                 Button(timerViewModel.startButtonTitle) {
                     timerViewModel.startOrResume()
+                    
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(timerViewModel.isStarted)
@@ -99,6 +102,10 @@ struct TimerView: View {
                 // -- Button (stop) --
                 Button("Stop") {
                     timerViewModel.stop()
+                    
+                    // -- Notify -- //
+                    notificationViewModel.notify(title: "Timer Stopped", message: "Total time: ...)")
+                    // -- End Notify -- //
                 }
                 .buttonStyle(.bordered)
                 .disabled(!timerViewModel.isStarted && !timerViewModel.isPaused)
