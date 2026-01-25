@@ -19,8 +19,10 @@ final class TimerViewModel: ObservableObject {
     @Published private(set) var remainingSeconds:Int
     
     @Published private(set) var totalSeconds: Int
-
+    
     @Published var minutesIndex: Int
+    
+    
     
     private var timerCancellable: AnyCancellable?
 
