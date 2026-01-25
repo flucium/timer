@@ -16,6 +16,8 @@ struct HomeView: View {
     
     @ObservedObject private var timerViewModel = TimerViewModel()
     
+    @EnvironmentObject private var notificationViewModel: NotificationViewModel
+
     var body: some View {
         // -- NavigationSplitView --
         NavigationSplitView {
@@ -47,7 +49,6 @@ struct HomeView: View {
                 return
             }
             
-            
             pendingDestination = newValue
             
             destination = .timer
@@ -62,6 +63,11 @@ struct HomeView: View {
 
                 destination = pendingDestination
                 pendingDestination = nil
+                
+                
+                // -- Notify -- //
+                notificationViewModel.notify(title: "Timer Stopped", message: "Total time: ...)")
+                // -- End Notify -- //
             }
             Button("Stay", role: .cancel) {
                 pendingDestination = nil
