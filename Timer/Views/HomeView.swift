@@ -46,7 +46,8 @@ struct HomeView: View {
             guard newValue != .timer else {
                 return
             }
-
+            
+            
             pendingDestination = newValue
             
             destination = .timer
