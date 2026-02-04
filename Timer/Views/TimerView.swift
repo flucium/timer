@@ -104,7 +104,7 @@ struct TimerView: View {
                     timerViewModel.stop()
                     
                     // -- Notify -- //
-                    notificationViewModel.notify(title: "Timer Stopped", message: "Total time: ...)")
+                    notificationViewModel.notify(title: "Timer Stopped", message: "Finished!")
                     // -- End Notify -- //
                 }
                 .buttonStyle(.bordered)
